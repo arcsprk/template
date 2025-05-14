@@ -2,33 +2,99 @@
 version: "1.1"  # 전체 YAML 파일 버전
 
 # 사용 가능한 모델 목록
-available_models:
-  - name: "gpt-4"
+models:
+  - &gpt-4
+    name: "gpt-4"
     provider: "openai"
     description: "고급 추론 및 복잡한 작업을 위한 모델"
     max_tokens: 8192
-  - name: "gpt-3.5-turbo"
+    api_config:
+      url: https://api.openai.com/v1/chat/completions
+      api_key_env: "OPENAI_API_KEY"
+      timeout: 60
+    parameters:
+      temperature: 0.3
+      max_tokens: 1000
+      top_p: 0.95
+  - &gpt-3.5-turbo
+    name: "gpt-3.5-turbo"
     provider: "openai"
     description: "일반적인 텍스트 생성 및 대화를 위한 빠른 모델"
     max_tokens: 4096
-  - name: "claude-3-opus"
+    api_config:
+      url: https://api.openai.com/v1/chat/completions
+      api_key_env: "OPENAI_API_KEY"
+      timeout: 60
+    parameters:
+      temperature: 0.3
+      max_tokens: 1000
+      top_p: 0.95          
+  - &claude-3-opus
+    name: "claude-3-opus"
     provider: "anthropic"
     description: "복잡한 작업과 자세한 분석을 위한 모델"
     max_tokens: 4096
-  - name: "claude-3-haiku"
+    api_config:
+      url: anthropic.claude-3-opus-v1
+      api_key_env: "ANTHROPIC_API_KEY"
+      timeout: 60
+    parameters:
+      temperature: 0.3
+      max_tokens: 1000
+      top_p: 0.95      
+  - &claude-3-haiku
+    name: "claude-3-haiku"
     provider: "anthropic"
     description: "빠른 응답과 간단한 작업을 위한 경량 모델"
     max_tokens: 2048
-  - name: "gemini-pro"
+    parameters:
+      temperature: 0.3
+      max_tokens: 1000
+      top_p: 0.95    
+  - &gemini-pro
+    name: "gemini-pro"
     provider: "google"
     description: "다양한 텍스트 작업을 위한 범용 모델"
     max_tokens: 8192
+    api_config:
+      url: https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent
+      api_key_env: "GOOGLE_API_KEY"
+      timeout: 60
+    parameters:
+      temperature: 0.3
+      max_tokens: 1000
+      top_p: 0.95
+
+
+default_prompt_setting:
+  # 전역 시스템 메시지 설정 (특정 작업에 시스템 메시지가 정의되지 않은 경우 사용)
+  system_prompt_default: &system_prompt_default
+    system_prompt_default_template: | 
+        당신은 유용하고 친절한 AI 어시스턴트입니다. 사용자의 요청에 정확하고 도움이 되는 응답을 제공하세요.
+        항상 윤리적이고 안전한 방식으로 응답하며, 요청이 부적절한 경우 정중하게 거절하세요.
+        {% if language %}응답은 {{ language }} 언어로 제공하세요.{% endif %}
+    system_prompt_input_variables:
+      - language
+    system_prompt_partial_variables:
+      professionalism_level: "{{ professionalism_level | default('높음') }}"
+    user_prompt_template: | 
+      {{ content }}
+    user_prompt_input_variables:
+      - content
+
 
 tasks:
-  # chat
-  chat:
-    system_prompt_template: 
-    <<: *default_system_prompt_template
+  default:  # chat
+    name: "기본 대화"
+    model: *gpt-4
+    parameters:
+      temperature: 0.3
+      max_tokens: 200
+      top_p: 0.95    
+    prompt:
+      <<: *system_prompt_default
+
+
 
     
 
@@ -41,22 +107,27 @@ tasks:
     updated_at: "2024-05-14"
     author: "AI 팀"
     model: "gpt-3.5-turbo"
-    system_prompt_template: |
-      당신은 텍스트를 자연스럽게 완성하는 전문가입니다. 사용자가 제공한 시작 텍스트를 기반으로 일관되고 논리적인 방식으로 내용을 확장하세요.
-      {% if writing_style %}글쓰기 스타일: {{ writing_style }}{% endif %}
-    system_input_variables:
-      - writing_style
-    system_partial_variables:
-      system_context: "{{ system_context | default('일반') }}"
-    user_prompt_template: |
-      다음 텍스트를 자연스럽게 완성해주세요:
-      {{ user_input }}
-      {% if word_limit %}단어 수 제한: {{ word_limit }}단어{% endif %}
-    user_input_variables:
-      - user_input
-    user_partial_variables:
-      current_date: "{{ now() | date_format('%Y-%m-%d') }}"
-      word_limit: "{{ word_limit | default('') }}"
+    parameters:
+      temperature: 0.3
+      max_tokens: 200
+      top_p: 0.95    
+    prompt: 
+      system_prompt_template: |
+        당신은 텍스트를 자연스럽게 완성하는 전문가입니다. 사용자가 제공한 시작 텍스트를 기반으로 일관되고 논리적인 방식으로 내용을 확장하세요.
+        {% if writing_style %}글쓰기 스타일: {{ writing_style }}{% endif %}
+      system_prompt_input_variables:
+        - writing_style
+      system_prompt_partial_variables:
+        system_context: "{{ system_context | default('일반') }}"
+      user_prompt_template: |
+        다음 텍스트를 자연스럽게 완성해주세요:
+        {{ user_prompt_input }}
+        {% if word_limit %}단어 수 제한: {{ word_limit }}단어{% endif %}
+      user_prompt_input_variables:
+        - user_prompt_input
+      user_prompt_partial_variables:
+        current_date: "{{ now() | date_format('%Y-%m-%d') }}"
+        word_limit: "{{ word_limit | default('') }}"
     parameters:
       temperature: 0.7
       max_tokens: 150
@@ -75,33 +146,34 @@ tasks:
     updated_at: "2024-05-10"
     author: "지식 베이스 팀"
     model: "claude-3-haiku"
-    system_prompt_template: |
-      당신은 지식이 풍부한 도우미로, 사용자의 질문에 정확하고 간결하게 답변합니다. 
-      {% if expertise %}전문 분야: {{ expertise }}{% endif %}
-      {% if answer_style %}답변 스타일: {{ answer_style }}{% endif %}
-    system_input_variables:
-      - expertise
-    system_partial_variables:
-      answer_style: "{{ answer_style | default('간결하고 명확하게') }}"
-    user_prompt_template: |
-      {% if context %}
-      다음 정보를 바탕으로 질문에 답변해주세요:
-      
-      컨텍스트:
-      {{ context }}
-      {% endif %}
-      
-      질문: {{ question }}
-      {% if max_length %}답변 길이: {{ max_length }}{% endif %}
-    user_input_variables:
-      - question
-      - context  # 선택적 변수
-    user_partial_variables:
-      max_length: "{{ max_length | default('') }}"
     parameters:
       temperature: 0.3
       max_tokens: 200
-      top_p: 0.95
+      top_p: 0.95    
+    prompt:     
+      system_prompt_template: |
+        당신은 지식이 풍부한 도우미로, 사용자의 질문에 정확하고 간결하게 답변합니다. 
+        {% if expertise %}전문 분야: {{ expertise }}{% endif %}
+        {% if answer_style %}답변 스타일: {{ answer_style }}{% endif %}
+      system_prompt_input_variables:
+        - expertise
+      system_prompt_partial_variables:
+        answer_style: "{{ answer_style | default('간결하고 명확하게') }}"
+      user_prompt_template: |
+        {% if context %}
+        다음 정보를 바탕으로 질문에 답변해주세요:
+        
+        컨텍스트:
+        {{ context }}
+        {% endif %}
+        
+        질문: {{ question }}
+        {% if max_length %}답변 길이: {{ max_length }}{% endif %}
+      user_prompt_input_variables:
+        - question
+        - context  # 선택적 변수
+      user_prompt_partial_variables:
+        max_length: "{{ max_length | default('') }}"
     tags:
       - qa
       - knowledge
@@ -116,37 +188,39 @@ tasks:
     updated_at: "2024-05-12"
     author: "콘텐츠 팀"
     model: "gpt-4"
-    system_prompt_template: |
-      당신은 텍스트 요약 전문가입니다. 복잡하고 긴 텍스트를 이해하기 쉽게 요약하는 능력이 있습니다.
-      {% if summarization_level %}요약 수준: {{ summarization_level }}{% endif %}
-      {% if focus_area %}중점 영역: {{ focus_area }}{% endif %}
-    system_input_variables:
-      - focus_area
-    system_partial_variables:
-      summarization_level: "{{ summarization_level | default('표준') }}"
-    user_prompt_template: |
-      다음 텍스트를 요약해주세요:
-      
-      {{ content }}
-      
-      {% if style == "bullet_points" %}
-      요점을 불릿 포인트로 요약하세요.
-      {% elif style == "paragraph" %}
-      요약을 단락 형태로 작성하세요.
-      {% else %}
-      주요 포인트 3-5개로 요약하세요.
-      {% endif %}
-      
-      {% if target_length %}목표 길이: {{ target_length }}{% endif %}
-    user_input_variables:
-      - content
-    user_partial_variables:
-      style: "{{ style | default('default') }}"
-      target_length: "{{ target_length | default('') }}"
     parameters:
       temperature: 0.4
       max_tokens: 250
       top_p: 0.85
+    prompt:
+      system_prompt_template: |
+        당신은 텍스트 요약 전문가입니다. 복잡하고 긴 텍스트를 이해하기 쉽게 요약하는 능력이 있습니다.
+        {% if summarization_level %}요약 수준: {{ summarization_level }}{% endif %}
+        {% if focus_area %}중점 영역: {{ focus_area }}{% endif %}
+      system_prompt_input_variables:
+        - focus_area
+      system_prompt_partial_variables:
+        summarization_level: "{{ summarization_level | default('표준') }}"
+      user_prompt_template: |
+        다음 텍스트를 요약해주세요:
+        
+        {{ content }}
+        
+        {% if style == "bullet_points" %}
+        요점을 불릿 포인트로 요약하세요.
+        {% elif style == "paragraph" %}
+        요약을 단락 형태로 작성하세요.
+        {% else %}
+        주요 포인트 3-5개로 요약하세요.
+        {% endif %}
+        
+        {% if target_length %}목표 길이: {{ target_length }}{% endif %}
+      user_prompt_input_variables:
+        - content
+      user_prompt_partial_variables:
+        style: "{{ style | default('default') }}"
+        target_length: "{{ target_length | default('') }}"
+
     tags:
       - summarization
       - content_processing
@@ -166,9 +240,9 @@ tasks:
       {% if code_style %}코딩 스타일: {{ code_style }}{% endif %}
       {% if complexity_level %}복잡성 수준: {{ complexity_level }}{% endif %}
       {% if include_tests == true %}단위 테스트를 포함하세요.{% endif %}
-    system_input_variables:
+    system_prompt_input_variables:
       - programming_language
-    system_partial_variables:
+    system_prompt_partial_variables:
       code_style: "{{ code_style | default('표준') }}"
       complexity_level: "{{ complexity_level | default('중간') }}"
       include_tests: "{{ include_tests | default(false) }}"
@@ -180,10 +254,10 @@ tasks:
       {% if framework %}프레임워크: {{ framework }}{% endif %}
       {% if libraries %}사용할 라이브러리: {{ libraries }}{% endif %}
       {% if performance_considerations %}성능 고려사항: {{ performance_considerations }}{% endif %}
-    user_input_variables:
+    user_prompt_input_variables:
       - requirements
       - language
-    user_partial_variables:
+    user_prompt_partial_variables:
       framework: "{{ framework | default('') }}"
       libraries: "{{ libraries | default('') }}"
       performance_considerations: "{{ performance_considerations | default('') }}"
@@ -219,10 +293,10 @@ tasks:
       {% if genre %}장르: {{ genre }}{% endif %}
       {% if writing_technique %}글쓰기 기법: {{ writing_technique }}{% endif %}
       {% if author_style %}작가 스타일: {{ author_style }}{% endif %}
-    system_input_variables:
+    system_prompt_input_variables:
       - creative_format
       - genre
-    system_partial_variables:
+    system_prompt_partial_variables:
       writing_technique: "{{ writing_technique | default('') }}"
       author_style: "{{ author_style | default('') }}"
     user_prompt_template: |
@@ -233,10 +307,10 @@ tasks:
       {% if tone %}톤: {{ tone }}{% endif %}
       {% if target_audience %}대상 독자: {{ target_audience }}{% endif %}
       {% if word_count %}단어 수: {{ word_count }}{% endif %}
-    user_input_variables:
+    user_prompt_input_variables:
       - starting_point
       - format
-    user_partial_variables:
+    user_prompt_partial_variables:
       tone: "{{ tone | default('') }}"
       target_audience: "{{ target_audience | default('') }}"
       word_count: "{{ word_count | default('') }}"
@@ -271,9 +345,9 @@ tasks:
       {% if analysis_depth %}분석 깊이: {{ analysis_depth }}{% endif %}
       {% if statistical_methods %}사용할 통계적 방법: {{ statistical_methods }}{% endif %}
       {% if visualization_preferences %}시각화 선호도: {{ visualization_preferences }}{% endif %}
-    system_input_variables:
+    system_prompt_input_variables:
       - analysis_depth
-    system_partial_variables:
+    system_prompt_partial_variables:
       statistical_methods: "{{ statistical_methods | default('기본') }}"
       visualization_preferences: "{{ visualization_preferences | default('') }}"
     user_prompt_template: |
@@ -285,9 +359,9 @@ tasks:
       {% if specific_questions %}구체적인 질문:
       {{ specific_questions }}{% endif %}
       {% if include_recommendations == true %}추천 사항을 포함하세요.{% endif %}
-    user_input_variables:
+    user_prompt_input_variables:
       - data
-    user_partial_variables:
+    user_prompt_partial_variables:
       analysis_focus: "{{ analysis_focus | default('') }}"
       specific_questions: "{{ specific_questions | default('') }}"
       include_recommendations: "{{ include_recommendations | default(false) }}"
@@ -317,20 +391,6 @@ default_settings:
     store_history: true
     max_history_items: 10
     deprecation_warning: true  # 오래된 버전 사용 시 경고 표시
-  default_prompt_setting:
-    # 전역 시스템 메시지 설정 (특정 작업에 시스템 메시지가 정의되지 않은 경우 사용)
-    default_system_prompt_template: &default_system_prompt_template | 
-      당신은 유용하고 친절한 AI 어시스턴트입니다. 사용자의 요청에 정확하고 도움이 되는 응답을 제공하세요.
-      항상 윤리적이고 안전한 방식으로 응답하며, 요청이 부적절한 경우 정중하게 거절하세요.
-      {% if language %}응답은 {{ language }} 언어로 제공하세요.{% endif %}
-    default_system_input_variables: &default_system_input_variables
-      - language
-    default_system_partial_variables: &default_system_partial_variables
-      professionalism_level: "{{ professionalism_level | default('높음') }}"
-    default_user_prompt_template: &default_system_prompt_template | 
-      {{ content }}
-    default_user_input_variables: &default_user_input_variables
-      - content
 
 
 # 샘플 작업 사용 예시
@@ -341,7 +401,7 @@ examples:
     system_variables:
       writing_style: "논리적이고 설명적인"
     user_variables:
-      user_input: "인공지능 기술은 현대 사회에서"
+      user_prompt_input: "인공지능 기술은 현대 사회에서"
       word_limit: "100"
     expected_output: "인공지능 기술은 현대 사회에서 다양한 산업 분야에 혁신을 가져오고 있습니다. 의료, 금융, 교육, 제조업 등 거의 모든 분야에서 AI는 효율성을 높이고 새로운 가능성을 열고 있습니다..."
   
@@ -365,15 +425,3 @@ default_model_fallback: &default_model_fallback
     - "gpt-3.5-turbo"
     - "claude-3-haiku"
 
-# API 설정
-api_config:
-  openai:
-    api_key_env: "OPENAI_API_KEY"
-    organization_id_env: "OPENAI_ORG_ID"
-    timeout: 30
-  anthropic:
-    api_key_env: "ANTHROPIC_API_KEY"
-    timeout: 45
-  google:
-    api_key_env: "GOOGLE_API_KEY"
-    timeout: 30
